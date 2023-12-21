@@ -1,0 +1,2 @@
+django~=4.2.7
+django-rq~=2.8.1

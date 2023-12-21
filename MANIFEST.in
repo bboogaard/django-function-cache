@@ -1,0 +1,3 @@
+exclude testapp/*
+exclude tests/*
+include cache-entries.png
