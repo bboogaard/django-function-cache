@@ -81,7 +81,7 @@ def my_expensive_function():
 You can set a global broker to delegate the cache updates in `settings.py`.
 
 ```python
-DUC_DEFAULT_BROKER = 'function_cache.brokers.AsyncBroker'
+DUC_DEFAULT_BROKER = 'update_cache.brokers.AsyncBroker'
 ```
 
 Invalidate the cache:
