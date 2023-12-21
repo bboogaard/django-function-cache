@@ -1,4 +1,5 @@
 from django.http.response import HttpResponse
+from django.template.response import TemplateResponse
 from update_cache.decorators import cache_view
 
 from testapp import cached_functions
@@ -28,7 +29,7 @@ def words(request):
 @cache_view()
 def short_strings(request):
     content = list(utils.create_random_strings(100))
-    return HttpResponse('\n'.join(content), content_type='text/plain')
+    return TemplateResponse(request, 'strings.html', context={'content': '\n'.join(content)})
 
 
 @cache_view(timeout=60)

@@ -4,6 +4,7 @@ from typing import Any, Callable, Dict, Optional, Protocol, Tuple, Union
 from django_rq import enqueue
 from django.core.cache import DEFAULT_CACHE_ALIAS
 from django.http import HttpRequest
+from django.template.response import ContentNotRenderedError
 from django.utils.module_loading import import_string
 from django.utils.timezone import now
 
@@ -82,6 +83,10 @@ class DefaultViewBroker:
             kwargs = {}
         f = getattr(f, '__wrapped__', None) or f
         live_result = f(request, *args, **kwargs)
+        try:
+            live_result.content
+        except ContentNotRenderedError:
+            live_result.render()
         result = CacheResult(
             result=live_result,
             expires=now() + datetime.timedelta(seconds=timeout)

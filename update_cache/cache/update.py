@@ -4,6 +4,7 @@ from typing import Any
 
 from django.core.cache import DEFAULT_CACHE_ALIAS
 from django.core.cache.backends.base import DEFAULT_TIMEOUT
+from django.template.response import ContentNotRenderedError
 from django.utils.timezone import now
 
 from update_cache.brokers import Broker, default_broker, get_broker, get_view_broker, ViewBroker
@@ -46,7 +47,7 @@ class CacheUpdateHandler:
 
         # No version found in cache, get live result and cache it
         logger.info(f'Getting live result for {key}')
-        live_result = self.cached_function.f(*args, **kwargs)
+        live_result = self.execute(*args, **kwargs)
         result = CacheResult(
             result=live_result,
             expires=now() + datetime.timedelta(seconds=self.timeout),
@@ -54,6 +55,10 @@ class CacheUpdateHandler:
         )
         self.cached_function.set_active(key, result)
         return result.result
+
+    def execute(self, *args, **kwargs):
+        live_result = self.cached_function.f(*args, **kwargs)
+        return live_result
 
     def delegate(self, *args, **kwargs):
         self.get_broker()(self.cached_function.f, self.timeout, (args, kwargs), self.backend)
@@ -91,6 +96,14 @@ class ViewUpdateHandler(CacheUpdateHandler):
         self.timeout = 300 if timeout == DEFAULT_TIMEOUT else timeout
         self.backend = backend
         self.broker = broker
+
+    def execute(self, *args, **kwargs):
+        live_result = super().execute(*args, **kwargs)
+        try:
+            live_result.content
+        except ContentNotRenderedError:
+            live_result.render()
+        return live_result
 
     def delegate(self, *args, **kwargs):
         # First arg should be request
