@@ -4,7 +4,7 @@ from django.test import RequestFactory
 from django.test.testcases import TestCase
 from freezegun import freeze_time
 from update_cache import brokers
-from update_cache.cache.cache import make_cache_key, make_view_cache_key
+from update_cache.cache.cache import make_cache_key, make_view_cache_key, missing
 
 from testapp import cached_functions, utils, views
 from testapp.cached_functions import random
@@ -268,6 +268,105 @@ class TestDecorators(TestCase):
         # After caching, results should not be equal, because we use dummy cache
         self.assertNotEqual(result1, result2)
 
+    @mock.patch.object(utils, 'get_random_string')
+    def test_cache_view_do_not_cache_post(self, get_string):
+        get_string.side_effect = 100 * [10 * 'a'] + 100 * [10 * 'b']
+        cache = views.short_strings.cache
+        request = RequestFactory().post('/testapp/short_strings/', {})
+
+        with freeze_time('2023-12-01T10:00:00Z'):
+            result1 = self._post_response('/testapp/short_strings/')
+        self.assertEqual(cache.get_active(make_view_cache_key(
+            request, 'POST'
+        )), missing)
+        self.assertEqual(get_string.call_count, 100)
+        with freeze_time('2023-12-01T10:00:01Z'):
+            result2 = self._post_response('/testapp/short_strings/')
+        self.assertEqual(get_string.call_count, 200)
+        # Results should be different, since we don't cache for post requests
+        self.assertNotEqual(result1, result2)
+
+    @mock.patch.object(random, 'choice')
+    def test_cache_view_do_not_cache_streaming(self, get_choice):
+        get_choice.side_effect = 100 * ['Lorem'] + 100 * ['Ipsum']
+        cache = views.lorem_words.cache
+        request = RequestFactory().get('/testapp/lorem_words/')
+
+        with freeze_time('2023-12-01T10:00:00Z'):
+            result1 = self._get_streaming('/testapp/lorem_words/')
+        self.assertEqual(cache.get_active(make_view_cache_key(
+            request, 'GET'
+        )), missing)
+        self.assertEqual(get_choice.call_count, 100)
+        with freeze_time('2023-12-01T10:00:01Z'):
+            result2 = self._get_streaming('/testapp/lorem_words/')
+        self.assertEqual(get_choice.call_count, 200)
+        # Results should be different, since we don't cache for streaming requests
+        self.assertNotEqual(result1, result2)
+
+    @mock.patch.object(utils, 'get_random_string')
+    def test_cache_view_do_not_cache_disallowed_status(self, get_string):
+        get_string.side_effect = 100 * [10 * 'a'] + 100 * [10 * 'b']
+        cache = views.error.cache
+        request = RequestFactory().get('/testapp/error/')
+
+        with freeze_time('2023-12-01T10:00:00Z'):
+            result1 = self._get_response('/testapp/error/')
+        self.assertEqual(cache.get_active(make_view_cache_key(
+            request, 'GET'
+        )), missing)
+        self.assertEqual(get_string.call_count, 100)
+        with freeze_time('2023-12-01T10:00:01Z'):
+            result2 = self._get_response('/testapp/error/')
+        self.assertEqual(get_string.call_count, 200)
+        # Results should be different, since we don't cache for status codes other than 200/304
+        self.assertNotEqual(result1, result2)
+
+    @mock.patch.object(utils, 'get_random_string')
+    def test_cache_view_do_not_cache_vary_header_cookie(self, get_string):
+        get_string.side_effect = 100 * [10 * 'a'] + 100 * [10 * 'b']
+        cache = views.with_cookie.cache
+        request = RequestFactory().get('/testapp/with_cookie/')
+
+        with freeze_time('2023-12-01T10:00:00Z'):
+            result1 = self._get_response('/testapp/with_cookie/')
+        self.assertEqual(cache.get_active(make_view_cache_key(
+            request, 'GET'
+        )), missing)
+        self.assertEqual(get_string.call_count, 100)
+        with freeze_time('2023-12-01T10:00:01Z'):
+            result2 = self._get_response('/testapp/with_cookie/')
+        self.assertEqual(get_string.call_count, 200)
+        # Results should be different, since we don't cache for responses with cookies and Vary header containing
+        # 'Cookie'
+        self.assertNotEqual(result1, result2)
+
+    @mock.patch.object(utils, 'get_random_string')
+    def test_cache_view_do_not_cache_cache_control_private(self, get_string):
+        get_string.side_effect = 100 * [10 * 'a'] + 100 * [10 * 'b']
+        cache = views.private_cache.cache
+        request = RequestFactory().get('/testapp/private_cache/')
+
+        with freeze_time('2023-12-01T10:00:00Z'):
+            result1 = self._get_response('/testapp/private_cache/')
+        self.assertEqual(cache.get_active(make_view_cache_key(
+            request, 'GET'
+        )), missing)
+        self.assertEqual(get_string.call_count, 100)
+        with freeze_time('2023-12-01T10:00:01Z'):
+            result2 = self._get_response('/testapp/private_cache/')
+        self.assertEqual(get_string.call_count, 200)
+        # Results should be different, since we don't cache for responses with Cache-Control: private
+        self.assertNotEqual(result1, result2)
+
     def _get_response(self, url):
         response = self.client.get(url)
         return response.content
+
+    def _post_response(self, url):
+        response = self.client.post(url, {})
+        return response.content
+
+    def _get_streaming(self, url):
+        response = self.client.get(url)
+        return b''.join(response.streaming_content)

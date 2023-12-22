@@ -4,11 +4,11 @@ from typing import Any, Callable, Dict, Optional, Protocol, Tuple, Union
 from django_rq import enqueue
 from django.core.cache import DEFAULT_CACHE_ALIAS
 from django.http import HttpRequest
-from django.template.response import ContentNotRenderedError
 from django.utils.module_loading import import_string
 from django.utils.timezone import now
 
 from update_cache.cache.cache import CacheResult, make_cache_key, make_view_cache_key
+from update_cache.cache.views import should_cache_view
 from update_cache.settings import settings
 from update_cache.utils import get_func_name
 
@@ -83,16 +83,24 @@ class DefaultViewBroker:
             kwargs = {}
         f = getattr(f, '__wrapped__', None) or f
         live_result = f(request, *args, **kwargs)
-        try:
-            live_result.content
-        except ContentNotRenderedError:
-            live_result.render()
-        result = CacheResult(
-            result=live_result,
-            expires=now() + datetime.timedelta(seconds=timeout)
-        )
-        cache_key = make_view_cache_key(request, request.method)
-        f.cache.set_active(cache_key, result)
+        if should_cache_view(request, live_result):
+            cache_key = make_view_cache_key(request, request.method)
+            self.save_result(f, cache_key, live_result, timeout)
+
+    def save_result(self, f: Callable, key: str, result: Any, timeout: int):
+
+        def _save_result(r: Any):
+            res = CacheResult(
+                result=r,
+                expires=now() + datetime.timedelta(seconds=timeout),
+            )
+            f.cache.set_active(key, res)
+
+        if hasattr(result, "render") and callable(result.render):
+            result.add_post_render_callback(_save_result)
+            result.render()
+        else:
+            _save_result(result)
 
 
 view_broker = DefaultViewBroker()

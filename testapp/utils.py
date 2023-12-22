@@ -24,3 +24,11 @@ def create_random_letters(num: int):
     for i in range(num):
         result.append(random.choice(letters))
     return result
+
+
+def create_random_words(num: int):
+    words = ['Lorem', 'Ipsum', 'Dolor']
+    result = []
+    for i in range(num):
+        result.append(random.choice(words))
+    return result
