@@ -3,7 +3,7 @@ from update_cache.version import Version
 
 
 setup(name='django-update-cache',
-     version=Version('1.0.4').number,
+     version=Version('1.0.6').number,
      description='Lazy cache updates for Django',
      long_description=open('README.md').read().strip(),
      long_description_content_type="text/markdown",

@@ -36,20 +36,20 @@ def short_strings(request):
     return HttpResponse('\n'.join(content), content_type='text/plain')
 
 
-@cache_view(timeout=60)
-def low_numbers(request):
-    content = utils.create_random_numbers(100)
-    return TemplateResponse(request, 'numbers.txt', context={'content': '\n'.join(content)}, content_type='text/plain')
-
-
 class LowerCaseLetters(APIView):
 
     renderer_classes = [renderers.JSONRenderer]
 
-    @method_decorator(cache_view(backend='dummy'))
+    @method_decorator(cache_view(timeout=60))
     def get(self, request, *args, **kwargs):
         content = utils.create_random_letters(100)
         return Response('\n'.join(content))
+
+
+@cache_view(backend='dummy')
+def low_numbers(request):
+    content = utils.create_random_numbers(100)
+    return TemplateResponse(request, 'numbers.txt', context={'content': '\n'.join(content)}, content_type='text/plain')
 
 
 @cache_view()

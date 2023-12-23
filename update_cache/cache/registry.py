@@ -70,7 +70,8 @@ class FunctionCacheRegistry:
         self.cached_functions = []
 
     def add(self, f: Callable, cache: BaseCache) -> CachedFunction:
-        if not (cached_function := next(filter(lambda c: c.f == f, self.cached_functions), None)):
+        if not (cached_function := next(filter(lambda c: c.func_name == get_func_name(f),
+                                               self.cached_functions), None)):
             cached_function = CachedFunction(f, cache)
             self.cached_functions.append(cached_function)
         return cached_function
