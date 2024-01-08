@@ -60,7 +60,7 @@ async_broker = AsyncBroker()
 
 
 def get_broker(broker: Broker = default_broker):
-    if broker == default_broker:
+    if broker is default_broker:
         try:
             broker_class = import_string(settings.DEFAULT_BROKER)
             return broker_class()
